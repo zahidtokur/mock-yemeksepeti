@@ -318,11 +318,10 @@ class Ui_MainWindow(object):
             "password" : self.registerPw.toPlainText(),
             "password_confirmation" : self.registerPwConfirm.toPlainText(),
         }
-        validate_register_form(register_form)
+        # validation = validate_register_form(register_form)
 
     def login(self):
         pass
-
 
 if __name__ == "__main__":
     import sys
