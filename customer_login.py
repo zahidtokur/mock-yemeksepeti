@@ -145,19 +145,19 @@ class Ui_MainWindow(object):
         font.setWeight(75)
         self.label_6.setFont(font)
         self.label_6.setObjectName("label_6")
-        self.registerEmail = QtWidgets.QPlainTextEdit(self.widget)
+        self.registerEmail = QtWidgets.QLineEdit(self.widget)
         self.registerEmail.setGeometry(QtCore.QRect(110, 15, 140, 24))
         self.registerEmail.setObjectName("registerEmail")
-        self.registerPw = QtWidgets.QPlainTextEdit(self.widget)
+        self.registerPw = QtWidgets.QLineEdit(self.widget)
         self.registerPw.setGeometry(QtCore.QRect(110, 60, 140, 24))
         self.registerPw.setObjectName("registerPw")
-        self.registerPwConfirm = QtWidgets.QPlainTextEdit(self.widget)
+        self.registerPwConfirm = QtWidgets.QLineEdit(self.widget)
         self.registerPwConfirm.setGeometry(QtCore.QRect(110, 105, 140, 24))
         self.registerPwConfirm.setObjectName("registerPwConfirm")
-        self.registerName = QtWidgets.QPlainTextEdit(self.widget)
+        self.registerName = QtWidgets.QLineEdit(self.widget)
         self.registerName.setGeometry(QtCore.QRect(110, 150, 140, 24))
         self.registerName.setObjectName("registerName")
-        self.registerSurname = QtWidgets.QPlainTextEdit(self.widget)
+        self.registerSurname = QtWidgets.QLineEdit(self.widget)
         self.registerSurname.setGeometry(QtCore.QRect(110, 195, 140, 24))
         self.registerSurname.setObjectName("registerSurname")
         self.registerButton = QtWidgets.QPushButton(self.widget)
@@ -178,12 +178,12 @@ class Ui_MainWindow(object):
         font.setWeight(75)
         self.label_7.setFont(font)
         self.label_7.setObjectName("label_7")
-        self.loginEmail = QtWidgets.QPlainTextEdit(self.widget_2)
+        self.loginEmail = QtWidgets.QLineEdit(self.widget_2)
         self.loginEmail.setGeometry(QtCore.QRect(35, 60, 200, 24))
         self.loginEmail.setObjectName("loginEmail")
-        self.loginPw = QtWidgets.QPlainTextEdit(self.widget_2)
+        self.loginPw = QtWidgets.QLineEdit(self.widget_2)
         self.loginPw.setGeometry(QtCore.QRect(35, 160, 200, 24))
-        self.loginPw.setPlainText("")
+        self.loginPw.setText("")
         self.loginPw.setObjectName("loginPw")
         self.loginButton = QtWidgets.QPushButton(self.widget_2)
         self.loginButton.setGeometry(QtCore.QRect(80, 290, 111, 41))
@@ -210,8 +210,25 @@ class Ui_MainWindow(object):
         self.retranslateUi(MainWindow)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
 
+        # SETTING RESTRICTIONS AND SLOT-SIGNALS
+
         self.registerButton.clicked.connect(self.register)
         self.loginButton.clicked.connect(self.login)
+
+        self.registerName.setMaxLength(100)
+        self.registerSurname.setMaxLength(100)
+        self.registerPw.setMaxLength(14)
+        self.registerPwConfirm.setMaxLength(14)
+        self.registerEmail.setMaxLength(320)
+
+        self.loginEmail.setMaxLength(320)
+        self.loginPw.setMaxLength(14)
+
+        self.registerPw.setEchoMode(QtWidgets.QLineEdit.Password)
+        self.registerPwConfirm.setEchoMode(QtWidgets.QLineEdit.Password)
+        self.loginPw.setEchoMode(QtWidgets.QLineEdit.Password)
+
+        #####
 
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
@@ -312,11 +329,11 @@ class Ui_MainWindow(object):
 
     def register(self):
         register_form = {
-            "email" : self.registerEmail.toPlainText(),
-            "name" : self.registerName.toPlainText(),
-            "surname" : self.registerSurname.toPlainText(),
-            "password" : self.registerPw.toPlainText(),
-            "password_confirmation" : self.registerPwConfirm.toPlainText(),
+            "email" : self.registerEmail.text(),
+            "name" : self.registerName.text(),
+            "surname" : self.registerSurname.text(),
+            "password" : self.registerPw.text(),
+            "password_confirmation" : self.registerPwConfirm.text(),
         }
         # validation = validate_register_form(register_form)
 

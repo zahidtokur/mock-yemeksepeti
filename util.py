@@ -10,8 +10,8 @@ def create_tables():
             id INTEGER PRIMARY KEY AUTOINCREMENT, 
             password CHAR(14) NOT NULL, 
             email CHAR(320) NOT NULL UNIQUE, 
-            name VARCHAR(255) NOT NULL, 
-            surname VARCHAR(255) NOT NULL,
+            name VARCHAR(100) NOT NULL, 
+            surname VARCHAR(100) NOT NULL,
             city CHAR(14) NOT NULL)""",
         """CREATE TABLE IF NOT EXISTS CustomerAddress(
             customer_id INTEGER NOT NULL,
