@@ -1,6 +1,6 @@
 from PyQt5 import QtCore, QtGui, QtWidgets
-import sqlite3
-from util import validate_register_form, create_tables
+import util
+from sqlite3 import OperationalError, IntegrityError
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
@@ -163,6 +163,9 @@ class Ui_MainWindow(object):
         self.registerButton = QtWidgets.QPushButton(self.widget)
         self.registerButton.setGeometry(QtCore.QRect(80, 290, 111, 41))
         self.registerButton.setObjectName("registerButton")
+        self.label_9 = QtWidgets.QLabel(self.widget)
+        self.label_9.setGeometry(QtCore.QRect(30, 340, 211, 20))
+        self.label_9.setObjectName("label_9")
         self.horizontalLayout.addWidget(self.widget)
         self.line = QtWidgets.QFrame(self.centralwidget)
         self.line.setFrameShape(QtWidgets.QFrame.VLine)
@@ -209,6 +212,8 @@ class Ui_MainWindow(object):
 
         self.retranslateUi(MainWindow)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
+
+        self.label_9.hide()
 
         # SETTING RESTRICTIONS AND SLOT-SIGNALS
 
@@ -326,6 +331,7 @@ class Ui_MainWindow(object):
         self.label_8.setText(_translate("MainWindow", "Şifre"))
         self.rememberMeCBox.setText(_translate("MainWindow", "Beni Hatırla"))
         self.keepSignedInCBox.setText(_translate("MainWindow", "Oturumumu açık tut"))
+        self.label_9.setText(_translate("MainWindow", "<html><head/><body><p align=\"center\">Başarıyla Kayıt Oldunuz!</p></body></html>"))
 
     def register(self):
         register_form = {
@@ -334,11 +340,28 @@ class Ui_MainWindow(object):
             "surname" : self.registerSurname.text(),
             "password" : self.registerPw.text(),
             "password_confirmation" : self.registerPwConfirm.text(),
+            "city" : str(self.cityChoice.currentText())
         }
-        # validation = validate_register_form(register_form)
+        validation_context = util.validate_register_form(register_form)
+        self.label_9.setText("<html><head/><body><p align=\"center\">"+validation_context['message']+"</p></body></html>")
+        self.label_9.show()
+        
+        if validation_context['validated'] == True:
+            try:
+                util.save_customer(register_form)
+            except OperationalError:
+                util.create_tables()
+                util.save_customer(register_form)
+            except IntegrityError:
+                self.label_9.setText("<html><head/><body><p align=\"center\">Bu E-Posta ile Zaten Kayıt Olunmuş!</p></body></html>")
 
     def login(self):
-        pass
+        login_form = {
+            "email" : self.loginEmail.text(),
+            "password" : self.loginPw.text(),
+        }
+        user_id = util.authenticate_user(login_form)
+        print(user_id)
 
 if __name__ == "__main__":
     import sys
