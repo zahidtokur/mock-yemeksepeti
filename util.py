@@ -48,14 +48,12 @@ def validate_register_form(register_form):
 
     return {'validated':True, 'message':'Başarıyla Kayıt Oldunuz!'}
 
-def validate_login():
-    pass
-
 
 def email_is_valid(email):
     if not re.match(r"[^@]+@[^@]+\.[^@]+", email) or ' ' in email:
         return False
     return True
+
 
 def save_customer(register_form):
     con = sqlite3.connect("database.db")
@@ -72,5 +70,4 @@ def authenticate_user(login_form):
     user = cursor.fetchone()
     if len(user) == 0:
         return -1
-    
     return user[0]
