@@ -21,6 +21,21 @@ def create_tables():
             address TEXT NOT NULL,
             address_description TEXT NOT NULL,
             FOREIGN KEY(customer_id) REFERENCES Customer(id))""",
+        """CREATE TABLE IF NOT EXISTS Restaurant(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name VARCHAR(200) NOT NULL UNIQUE,
+            city CHAR(14) NOT NULL,
+            town VARCHAR(50) NOT NULL,
+            district CHAR(20) NOT NULL,
+            address VARCHAR(400) NOT NULL,
+            phone_number CHAR(11) NOT NULL UNIQUE,
+            owner_ssn INTEGER NOT NULL,
+            owner_name VARCHAR(100) NOT NULL,
+            owner_surname VARCHAR(100) NOT NULL,
+            owner_phone_number CHAR(13) NOT NULL,
+            email CHAR(320) NOT NULL UNIQUE,
+            password CHAR(14) NOT NULL,
+        )"""
     ]
 
     for query in queries:
@@ -29,7 +44,7 @@ def create_tables():
     con.commit()
     con.close()
 
-def validate_register_form(register_form):
+def validate_user_register(register_form):
     #VALIDATING E-MAIL
     if not email_is_valid(register_form['email']):
         return {'validated':False, 'message':'Hatalı E-Posta Girdiniz.'}
@@ -47,6 +62,40 @@ def validate_register_form(register_form):
         return {'validated':False, 'message':'Şifreler Uyuşmuyor.'}
 
     return {'validated':True, 'message':'Başarıyla Kayıt Oldunuz!'}
+
+
+def validate_owner_register(register_form):
+    #VALIDATING RESTAURANT NAME
+    if len(register_form["name"]) == 0:
+        return {'validated':False, 'message':'Restoran Adını Kontrol Ediniz.'}
+    #VALIDATING SSN
+    if not len(register_form["owner_ssn"]) == 0:
+        return {'validated':False, 'message':"TCKN'yi Kontrol Ediniz."}
+    #VALIDATING OWNER NAME
+    if not register_form["owner_name"].replace(" ", "").isalpha():
+        return {'validated': False, 'message': 'Adı Kontrol Ediniz.'}
+    #VALIDATING OWNER SURNAME
+    if not register_form['owner_surname'].replace(" ", "").isalpha():
+        return {'validated': False, 'message': 'Soyadı Kontrol Ediniz.'}
+    #VALIDATING RESTAURANT PHONE NO
+    if not len(register_form["phone_number"]) == 11:
+        return {'validated': False, 'message': 'Restoran Telefonu 0xxxxxxxxxx Olmalıdır.'}
+    #VALIDATING OWNER PHONE NO
+    if not len(register_form["owner_phone_number"]) == 13:
+        return {'validated': False, 'message': 'Telefon Numarası 0xxxxxxxxxxxx Olmalıdır.'}
+    #VALIDATING E-MAIL
+    if not email_is_valid(register_form["email"]):
+        return {'validated': False, 'message': 'Hatalı E-Posta Girdiniz.'}
+    #VALIDATING PASSWORD
+    if len(register_form['password']) < 8:
+        return {'validated': False, 'message': 'Şifre 8-14 Karakter Olmalıdır.'}
+    #VALIDATING PASSWORD CONFIRMATION
+    if register_form['password'] != register_form['password_confirmation']:
+        return {'validated': False, 'message': 'Şifreler Uyuşmuyor.'}
+    
+    return {'validated': True, 'message': 'Başarıyla Kayıt Oldunuz!'}
+
+
 
 
 def email_is_valid(email):
