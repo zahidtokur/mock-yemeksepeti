@@ -32,10 +32,9 @@ def create_tables():
             owner_ssn INTEGER NOT NULL,
             owner_name VARCHAR(100) NOT NULL,
             owner_surname VARCHAR(100) NOT NULL,
-            owner_phone_number CHAR(13) NOT NULL,
+            owner_phone_number CHAR(11) NOT NULL,
             email CHAR(320) NOT NULL UNIQUE,
-            password CHAR(14) NOT NULL,
-        )"""
+            password CHAR(14) NOT NULL)""",
     ]
 
     for query in queries:
@@ -69,20 +68,22 @@ def validate_owner_register(register_form):
     if len(register_form["name"]) == 0:
         return {'validated':False, 'message':'Restoran Adını Kontrol Ediniz.'}
     #VALIDATING SSN
-    if not len(register_form["owner_ssn"]) == 0:
+    if len(register_form["owner_ssn"]) != 11:
         return {'validated':False, 'message':"TCKN'yi Kontrol Ediniz."}
+    if len(register_form["address"]) == 0:
+        return {'validated':False, 'message':"Adresi Kontrol Ediniz."}
     #VALIDATING OWNER NAME
     if not register_form["owner_name"].replace(" ", "").isalpha():
         return {'validated': False, 'message': 'Adı Kontrol Ediniz.'}
     #VALIDATING OWNER SURNAME
     if not register_form['owner_surname'].replace(" ", "").isalpha():
         return {'validated': False, 'message': 'Soyadı Kontrol Ediniz.'}
-    #VALIDATING RESTAURANT PHONE NO
-    if not len(register_form["phone_number"]) == 11:
-        return {'validated': False, 'message': 'Restoran Telefonu 0xxxxxxxxxx Olmalıdır.'}
     #VALIDATING OWNER PHONE NO
-    if not len(register_form["owner_phone_number"]) == 13:
+    if len(register_form["owner_phone_number"]) != 11 or not register_form["owner_phone_number"].startswith("0"):
         return {'validated': False, 'message': 'Telefon Numarası 0xxxxxxxxxxxx Olmalıdır.'}
+    #VALIDATING RESTAURANT PHONE NO
+    if len(register_form["phone_number"]) != 11 or not register_form["phone_number"].startswith("0") :
+        return {'validated': False, 'message': 'Restoran Telefonu 0xxxxxxxxxx Olmalıdır.'}
     #VALIDATING E-MAIL
     if not email_is_valid(register_form["email"]):
         return {'validated': False, 'message': 'Hatalı E-Posta Girdiniz.'}
@@ -96,8 +97,6 @@ def validate_owner_register(register_form):
     return {'validated': True, 'message': 'Başarıyla Kayıt Oldunuz!'}
 
 
-
-
 def email_is_valid(email):
     if not re.match(r"[^@]+@[^@]+\.[^@]+", email) or ' ' in email:
         return False
@@ -109,6 +108,19 @@ def save_customer(register_form):
     cursor = con.cursor()
     form_tuple = (register_form['email'], register_form['password'], register_form['name'], register_form['surname'], register_form['city'])
     cursor.execute('INSERT INTO Customer (email,password,name,surname,city) values (?,?,?,?,?)', form_tuple)
+    con.commit()
+    con.close()
+
+def save_restaurant(register_form):
+    con = sqlite3.connect("database.db")
+    cursor = con.cursor()
+    form_tuple = (register_form['name'], register_form['city'], register_form['town'],
+                  register_form['district'], register_form['address'], register_form['phone_number'],
+                  register_form['owner_ssn'], register_form['owner_name'], register_form['owner_surname'],
+                  register_form['owner_phone_number'], register_form['email'], register_form['password'])
+
+    cursor.execute('''INSERT INTO Restaurant (name, city, town, district, address, phone_number, owner_ssn, owner_name, 
+                      owner_surname, owner_phone_number, email, password) values (?,?,?,?,?,?,?,?,?,?,?,?)''', form_tuple)
     con.commit()
     con.close()
 
