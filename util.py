@@ -11,10 +11,11 @@ def create_tables():
             email CHAR(320) NOT NULL UNIQUE, 
             password CHAR(14) NOT NULL, 
             name VARCHAR(100) NOT NULL, 
-            surname VARCHAR(100) NOT NULL,
-            city CHAR(14) NOT NULL)""",
+            surname VARCHAR(100) NOT NULL)""",
         """CREATE TABLE IF NOT EXISTS CustomerAddress(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
             customer_id INTEGER NOT NULL,
+            address_name CHAR(30) NOT NULL,
             phone_number CHAR(13) NOT NULL,
             city CHAR(14) NOT NULL,
             district VARCHAR(255) NOT NULL,
@@ -35,6 +36,13 @@ def create_tables():
             owner_phone_number CHAR(11) NOT NULL,
             email CHAR(320) NOT NULL UNIQUE,
             password CHAR(14) NOT NULL)""",
+        """CREATE TABLE IF NOT EXISTS Product(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name VARCHAR(200) NOT NULL UNIQUE,
+            price REAL NOT NULL,
+            description VARCHAR(200),
+            restaurant_id INTEGER NOT NULL,
+            FOREIGN KEY(restaurant_id) REFERENCES Restaurant(id))""",            
     ]
 
     for query in queries:
@@ -79,10 +87,10 @@ def validate_owner_register(register_form):
     if not register_form['owner_surname'].replace(" ", "").isalpha():
         return {'validated': False, 'message': 'Soyadı Kontrol Ediniz.'}
     #VALIDATING OWNER PHONE NO
-    if len(register_form["owner_phone_number"]) != 11 or not register_form["owner_phone_number"].startswith("0"):
+    if len(register_form["owner_phone_number"]) != 11 or not register_form["owner_phone_number"].startswith("0") or ',' in register_form["owner_phone_number"]:
         return {'validated': False, 'message': 'Telefon Numarası 0xxxxxxxxxxxx Olmalıdır.'}
     #VALIDATING RESTAURANT PHONE NO
-    if len(register_form["phone_number"]) != 11 or not register_form["phone_number"].startswith("0") :
+    if len(register_form["phone_number"]) != 11 or not register_form["phone_number"].startswith("0") or ',' in register_form["phone_number"]:
         return {'validated': False, 'message': 'Restoran Telefonu 0xxxxxxxxxx Olmalıdır.'}
     #VALIDATING E-MAIL
     if not email_is_valid(register_form["email"]):
@@ -106,8 +114,8 @@ def email_is_valid(email):
 def save_customer(register_form):
     con = sqlite3.connect("database.db")
     cursor = con.cursor()
-    form_tuple = (register_form['email'], register_form['password'], register_form['name'], register_form['surname'], register_form['city'])
-    cursor.execute('INSERT INTO Customer (email,password,name,surname,city) values (?,?,?,?,?)', form_tuple)
+    form_tuple = (register_form['email'], register_form['password'], register_form['name'], register_form['surname'])
+    cursor.execute('INSERT INTO Customer (email,password,name,surname) values (?,?,?,?)', form_tuple)
     con.commit()
     con.close()
 
@@ -129,6 +137,54 @@ def authenticate_user(login_form):
     cursor = con.cursor()
     cursor.execute('SELECT id FROM Customer WHERE email=? AND password=?', (login_form['email'], login_form['password']))
     user = cursor.fetchone()
-    if len(user) == 0:
+    try:
+        if len(user) != 0:
+            return user[0]
+    except:
         return -1
-    return user[0]
+
+
+def authenticate_owner(login_form):
+    con = sqlite3.connect("database.db")
+    cursor = con.cursor()
+    cursor.execute('SELECT id FROM Restaurant WHERE email=? AND password=?', (login_form['email'], login_form['password']))
+    user = cursor.fetchone()
+    try:
+        if len(user) != 0:
+            return user[0]
+    except:
+        return -1
+
+
+def save_product(name, description, price, restaurant_id):
+    con = sqlite3.connect("database.db")
+    cursor = con.cursor()
+    cursor.execute('INSERT INTO Product (name, price, description, restaurant_id) values (?,?,?,?)'
+                    ,(name, price, description, restaurant_id))
+
+    con.commit()
+    con.close()
+
+
+def update_product(name, description, price, product_id):
+    con = sqlite3.connect("database.db")
+    cursor = con.cursor()
+    cursor.execute('UPDATE Product SET name = ?, description = ?, price = ? WHERE id = ?', (name, description, price, product_id))
+    con.commit()
+    con.close()
+
+def find_restaurants(city, town, district):
+    con = sqlite3.connect("database.db")
+    cursor = con.cursor()
+    cursor.execute('SELECT id, name FROM Restaurant WHERE city = ? AND town = ? AND district = ?', (city, town, district))
+    result = cursor.fetchall()
+    con.close()
+    return result
+
+def find_products(restaurant_id):
+    con = sqlite3.connect("database.db")
+    cursor = con.cursor()
+    cursor.execute('SELECT id, name, price, description FROM Product WHERE restaurant_id = ?', (restaurant_id,))
+    result = cursor.fetchall()
+    con.close()
+    return result
