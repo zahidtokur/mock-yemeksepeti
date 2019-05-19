@@ -15,12 +15,12 @@ def create_tables():
         """CREATE TABLE IF NOT EXISTS CustomerAddress(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             customer_id INTEGER NOT NULL,
-            address_name CHAR(30) NOT NULL,
-            phone_number CHAR(13) NOT NULL,
+            phone_number CHAR(11) NOT NULL,
             city CHAR(14) NOT NULL,
+            town VARCHAR(50) NOT NULL,
             district VARCHAR(255) NOT NULL,
-            address TEXT NOT NULL,
-            address_description TEXT NOT NULL,
+            address VARCHAR(300) NOT NULL,
+            address_description VARCHAR(300) NOT NULL,
             FOREIGN KEY(customer_id) REFERENCES Customer(id))""",
         """CREATE TABLE IF NOT EXISTS Restaurant(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -42,7 +42,7 @@ def create_tables():
             price REAL NOT NULL,
             description VARCHAR(200),
             restaurant_id INTEGER NOT NULL,
-            FOREIGN KEY(restaurant_id) REFERENCES Restaurant(id))""",            
+            FOREIGN KEY(restaurant_id) REFERENCES Restaurant(id))""",           
     ]
 
     for query in queries:
@@ -104,6 +104,14 @@ def validate_owner_register(register_form):
     
     return {'validated': True, 'message': 'Başarıyla Kayıt Oldunuz!'}
 
+
+def validate_address(address_form):
+    if len(address_form["phone_number"]) != 11 or not address_form["phone_number"].startswith("0") or ',' in address_form["phone_number"]:
+        return {'validated': False, 'message': 'Telefon Numarası 0xxxxxxxxxxxx Olmalıdır.'}
+    if len(address_form['address']) == 0 or len(address_form['address_description']) == 0:
+        return {'validated': False, 'message': 'Bütün Alanlar Zorunludur'}
+    
+    return {'validated': True, 'message': 'Adres Kaydedildi!'}
 
 def email_is_valid(email):
     if not re.match(r"[^@]+@[^@]+\.[^@]+", email) or ' ' in email:
@@ -188,3 +196,33 @@ def find_products(restaurant_id):
     result = cursor.fetchall()
     con.close()
     return result
+
+def find_addresses(customer_id):
+    con = sqlite3.connect("database.db")
+    cursor = con.cursor()
+    query = 'SELECT id,phone_number,city,town,district,address,address_description FROM CustomerAddress WHERE customer_id = ?'
+    cursor.execute(query, (customer_id,))
+    result = cursor.fetchall()
+    con.close()
+    return result
+
+def empty_basket_db():
+    con = sqlite3.connect("basket.db")
+    cursor = con.cursor()
+    cursor.execute('DELETE FROM Basket')
+    con.commit()
+    con.close()
+
+def save_address(address_form):
+    con = sqlite3.connect("database.db")
+    cursor = con.cursor()
+    query = """INSERT INTO CustomerAddress 
+    (phone_number, city, town, district, address, address_description, customer_id) 
+    VALUES (?,?,?,?,?,?,?)"""
+
+    cursor.execute(query, 
+                (address_form['phone_number'], address_form['city'], address_form['town'], address_form['district'], 
+                 address_form['address'], address_form['address_description'], address_form['user_id']))
+
+    con.commit()
+    con.close()

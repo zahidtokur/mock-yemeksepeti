@@ -1,6 +1,7 @@
 from PyQt5 import QtCore, QtGui, QtWidgets
 import util
-from sqlite3 import OperationalError, IntegrityError
+import sqlite3
+from time import sleep
 
 class LoginWindow(object):
     def setupUi(self, MainWindow):
@@ -184,10 +185,10 @@ class LoginWindow(object):
         if validation_context['validated'] == True:
             try:
                 util.save_customer(register_form)
-            except OperationalError:
+            except sqlite3.OperationalError:
                 util.create_tables()
                 util.save_customer(register_form)
-            except IntegrityError:
+            except sqlite3.IntegrityError:
                 self.label_9.setText("<html><head/><body><p align=\"center\">Bu E-Posta ile Zaten Kayıt Olunmuş!</p></body></html>")
 
     def login(self, MainWindow):
@@ -252,8 +253,8 @@ class CustomerMainWindow(object):
         self.tabWidget.addTab(self.mainTab, "")
         self.basketTab = QtWidgets.QWidget()
         self.basketTable = QtWidgets.QTableWidget(self.basketTab)
-        self.basketTable.setGeometry(QtCore.QRect(50, 40, 471, 192))
-        self.basketTable.setColumnCount(4)
+        self.basketTable.setGeometry(QtCore.QRect(40, 40, 511, 192))
+        self.basketTable.setColumnCount(5)
         self.basketTable.setRowCount(0)
         item = QtWidgets.QTableWidgetItem()
         self.basketTable.setHorizontalHeaderItem(0, item)
@@ -263,6 +264,8 @@ class CustomerMainWindow(object):
         self.basketTable.setHorizontalHeaderItem(2, item)
         item = QtWidgets.QTableWidgetItem()
         self.basketTable.setHorizontalHeaderItem(3, item)
+        item = QtWidgets.QTableWidgetItem()
+        self.basketTable.setHorizontalHeaderItem(4, item)
         self.removeProductButton = QtWidgets.QPushButton(self.basketTab)
         self.removeProductButton.setGeometry(QtCore.QRect(70, 310, 95, 23))
         self.confirmButton = QtWidgets.QPushButton(self.basketTab)
@@ -383,6 +386,7 @@ class CustomerMainWindow(object):
         self.user_id = user_id
         self.restaurants = []
         self.products = []
+        self.addresses = []
 
         self.retranslateUi(MainWindow)
         self.tabWidget.setCurrentIndex(0)
@@ -393,10 +397,23 @@ class CustomerMainWindow(object):
 
         self.searchButton.clicked.connect(self.load_restaurants)
 
-        self.mainListWidget.itemDoubleClicked.connect(self.load_products)
+        self.mainListWidget.itemDoubleClicked.connect(self.handle_double_click)
 
         self.backButton.hide()
         self.backButton.clicked.connect(self.load_restaurants)
+
+        self.load_basket_timer = QtCore.QTimer()
+        self.load_basket_timer.timeout.connect(self.load_basket)
+        self.load_addresses_timer = QtCore.QTimer()
+        self.load_addresses_timer.timeout.connect(self.load_addresses)
+
+
+        self.emptyBasketButton.clicked.connect(self.empty_basket)
+        self.removeProductButton.clicked.connect(self.remove_from_basket)
+
+        self.newAddressButton.clicked.connect(lambda:self.show_address_window(self.load_addresses_timer))
+        self.load_addresses()
+
 
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
@@ -408,17 +425,19 @@ class CustomerMainWindow(object):
         self.searchButton.setText(_translate("MainWindow", "Ara"))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.mainTab), _translate("MainWindow", "Restoran Ara"))
         item = self.basketTable.horizontalHeaderItem(0)
-        item.setText(_translate("MainWindow", "Adet"))
+        item.setText(_translate("MainWindow", "ID"))
         item = self.basketTable.horizontalHeaderItem(1)
-        item.setText(_translate("MainWindow", "Ürün Adı"))
+        item.setText(_translate("MainWindow", "Adet"))
         item = self.basketTable.horizontalHeaderItem(2)
-        item.setText(_translate("MainWindow", "Açıklama"))
+        item.setText(_translate("MainWindow", "Ürün Adı"))
         item = self.basketTable.horizontalHeaderItem(3)
+        item.setText(_translate("MainWindow", "Açıklama"))
+        item = self.basketTable.horizontalHeaderItem(4)
         item.setText(_translate("MainWindow", "Toplam Tutar"))
         self.removeProductButton.setText(_translate("MainWindow", "Seçili Ürünü Kaldır"))
         self.confirmButton.setText(_translate("MainWindow", "Onayla"))
         self.label_4.setText(_translate("MainWindow", "Sepet Tutarı:"))
-        self.totalPrice.setText(_translate("MainWindow", "<html><head/><body><p align=\"center\">20,35 TL</p></body></html>"))
+        self.totalPrice.setText(_translate("MainWindow", "<html><head/><body><p align=\"center\">0 TL</p></body></html>"))
         self.emptyBasketButton.setText(_translate("MainWindow", "Sepeti Boşalt"))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.basketTab), _translate("MainWindow", "Sepetim"))
         self.newAddressButton.setText(_translate("MainWindow", "Adres Ekle"))
@@ -442,16 +461,430 @@ class CustomerMainWindow(object):
         for data in self.restaurants:
             self.mainListWidget.addItem(list(data)[1])
 
-    def load_products(self):
-        current_index = self.mainListWidget.currentRow()
-        restaurant_id = list(self.restaurants[current_index])[0]
-        self.products = util.find_products(restaurant_id)
-        self.mainListWidget.clear()
-        for data in self.products:
-            self.mainListWidget.addItem(list(data)[1] + " " + str(list(data)[2]) + " TL")
-        
-        self.backButton.show()
+    def handle_double_click(self):
+        current_item = self.mainListWidget.currentItem()
+        if current_item.text().endswith("TL"):
+            current_index = self.mainListWidget.currentRow()
+            product_details = list(self.products[current_index])
+            self.add_to_basket_window = QtWidgets.QWidget()
+            self.add_to_basket_window_ui = AddToBasketWindow()
+            self.add_to_basket_window_ui.setupUi(self.add_to_basket_window, self.load_basket_timer, product_details[0], 
+                                                    product_details[1], product_details[2], product_details[3])
+            self.add_to_basket_window.show()
 
+        else:
+            current_index = self.mainListWidget.currentRow()
+            restaurant_id = list(self.restaurants[current_index])[0]
+            self.products = util.find_products(restaurant_id)
+            self.mainListWidget.clear()
+            for data in self.products:
+                self.mainListWidget.addItem(list(data)[1] + " " + str(list(data)[2]) + " TL")
+        
+            self.backButton.show()
+
+    def load_basket(self):
+        con = sqlite3.connect('basket.db')
+        cursor = con.cursor()
+        query = 'SELECT product_id,piece,name,description,total_price FROM Basket'
+        cursor.execute(query)
+        result = cursor.fetchall()
+        self.basketTable.setRowCount(0)
+        count = 0
+        for row_number, row_data in enumerate(result):
+            self.basketTable.insertRow(row_number)
+            count += 1
+            for column_number, data in enumerate(row_data):
+                self.basketTable.setItem(row_number, column_number, QtWidgets.QTableWidgetItem(str(data)))
+        con.close()
+        self.update_basket_tab_text(count)
+        self.calculate_total_price()
+
+    def calculate_total_price(self):
+        price = 0
+        for row in range(self.basketTable.rowCount()):
+            price += float(self.basketTable.item(row, 4).text().replace(",","."))
+        price = str(price).replace(".",",")
+        self.totalPrice.setText("<html><head/><body><p align=\"center\">"+ price +" TL</p></body></html>")
+
+    def empty_basket(self):
+        util.empty_basket_db()
+        self.load_basket()
+
+    def remove_from_basket(self):
+        con = sqlite3.connect('basket.db')
+        cursor = con.cursor()
+
+        rows = sorted(set(index.row()for index in self.basketTable.selectedIndexes()))
+        products_to_delete = []
+
+        for row in rows:
+            product_id = self.basketTable.item(row, 0).text()
+            products_to_delete.append(product_id)
+
+        for product_id in products_to_delete:
+            cursor.execute("DELETE FROM Basket WHERE product_id = ?", (product_id,))
+
+        con.commit()
+        con.close()
+        self.load_basket()
+
+    def update_basket_tab_text(self, count):
+        if count > 0:
+            self.tabWidget.setTabText(self.tabWidget.indexOf(self.basketTab), "Sepetim(" +str(count)+ ")")
+        else:
+            self.tabWidget.setTabText(self.tabWidget.indexOf(self.basketTab), "Sepetim")
+
+    def show_address_window(self, timer, update=False, address_details=None):
+        if not update:
+            self.address_window = QtWidgets.QWidget()
+            self.address_window_ui = AddressWindow()
+            self.address_window_ui.setupUi(self.address_window, self.user_id, timer)
+            self.address_window.show()
+
+    def load_addresses(self):
+        self.addressList.clear()
+        self.addresses = util.find_addresses(self.user_id)
+        for data in self.addresses:
+            item = str(list(data)[5])[:30] + "... " + str(list(data)[3]) + "/" + str(list(data)[2])
+            self.addressList.addItem(item)
+            
+        
+
+class AddToBasketWindow(object):
+    def setupUi(self, Form, timer, product_id, product_name, product_price, product_description):
+        Form.resize(400, 164)
+        Form.setMinimumSize(QtCore.QSize(400, 164))
+        Form.setMaximumSize(QtCore.QSize(400, 164))
+        self.name = QtWidgets.QLineEdit(Form)
+        self.name.setEnabled(True)
+        self.name.setGeometry(QtCore.QRect(20, 50, 113, 20))
+        self.name.setFrame(True)
+        self.name.setReadOnly(True)
+        self.description = QtWidgets.QLineEdit(Form)
+        self.description.setGeometry(QtCore.QRect(20, 110, 113, 20))
+        self.description.setReadOnly(True)
+        self.price = QtWidgets.QLineEdit(Form)
+        self.price.setGeometry(QtCore.QRect(160, 50, 113, 20))
+        self.price.setReadOnly(True)
+        self.piece = QtWidgets.QSpinBox(Form)
+        self.piece.setGeometry(QtCore.QRect(300, 50, 61, 22))
+        self.piece.setProperty("value", 1)
+        self.piece.setMinimum(1)
+        self.addToBasketButton = QtWidgets.QPushButton(Form)
+        self.addToBasketButton.setGeometry(QtCore.QRect(290, 105, 75, 23))
+        self.label = QtWidgets.QLabel(Form)
+        self.label.setGeometry(QtCore.QRect(30, 30, 41, 16))
+        font = QtGui.QFont()
+        font.setBold(True)
+        font.setWeight(75)
+        self.label.setFont(font)
+        self.label_2 = QtWidgets.QLabel(Form)
+        self.label_2.setGeometry(QtCore.QRect(30, 90, 61, 16))
+        font = QtGui.QFont()
+        font.setBold(True)
+        font.setWeight(75)
+        self.label_2.setFont(font)
+        self.label_3 = QtWidgets.QLabel(Form)
+        self.label_3.setGeometry(QtCore.QRect(170, 30, 47, 13))
+        font = QtGui.QFont()
+        font.setBold(True)
+        font.setWeight(75)
+        self.label_3.setFont(font)
+        self.label_4 = QtWidgets.QLabel(Form)
+        self.label_4.setGeometry(QtCore.QRect(170, 90, 91, 16))
+        font = QtGui.QFont()
+        font.setBold(True)
+        font.setWeight(75)
+        self.label_4.setFont(font)
+        self.label_5 = QtWidgets.QLabel(Form)
+        self.label_5.setGeometry(QtCore.QRect(310, 30, 47, 13))
+        font = QtGui.QFont()
+        font.setBold(True)
+        font.setWeight(75)
+        self.label_5.setFont(font)
+        self.price_label = QtWidgets.QLabel(Form)
+        self.price_label.setGeometry(QtCore.QRect(190, 110, 51, 16))
+
+        self.product_id = product_id
+        self.product_name = product_name
+        self.product_description = product_description
+        self.product_price = float(str(product_price).replace(",","."))
+
+        self.name.setText(self.product_name)
+        self.description.setText(self.product_description)
+        self.description.setCursorPosition(0)
+        self.price.setText(str(self.product_price) + " TL")
+
+        self.retranslateUi(Form)
+        self.price_label.setText(str(self.product_price) + " TL")
+
+        self.piece.valueChanged.connect(self.calculate_price)
+        self.addToBasketButton.clicked.connect(lambda:self.addToBasket(Form, timer))
+
+        QtCore.QMetaObject.connectSlotsByName(Form)
+
+    def retranslateUi(self, Form):
+        _translate = QtCore.QCoreApplication.translate
+        Form.setWindowTitle(_translate("Form", "Form"))
+        self.addToBasketButton.setText(_translate("Form", "Sepete Ekle"))
+        self.label.setText(_translate("Form", "Ürün:"))
+        self.label_2.setText(_translate("Form", "Açıklama:"))
+        self.label_3.setText(_translate("Form", "Fiyat:"))
+        self.label_4.setText(_translate("Form", "Toplam Tutar:"))
+        self.label_5.setText(_translate("Form", "Adet:"))
+        self.price_label.setText(_translate("Form", "20.05 TL"))
+
+    def calculate_price(self):
+        new_price = self.product_price * self.piece.value()
+        self.price_label.setText(str(new_price) + " TL")
+
+    def addToBasket(self, Form, timer):
+        con = sqlite3.connect('basket.db')
+        cursor = con.cursor()
+        values = (self.product_id, self.piece.value(), self.product_name, self.product_description, 
+                  str(self.product_price * self.piece.value()).replace(".",","))
+
+        cursor.execute("INSERT INTO Basket (product_id, piece, name, description, total_price) VALUES (?,?,?,?,?)", values)
+        con.commit()
+        con.close()        
+        timer.timeout.emit()
+        Form.close()
+
+
+class AddressWindow(object):
+    def setupUi(self, Form, user_id, timer, address_details=None):
+        Form.resize(335, 407)
+        Form.setMinimumSize(QtCore.QSize(335, 407))
+        Form.setMaximumSize(QtCore.QSize(335, 407))
+        self.phoneNumber = QtWidgets.QLineEdit(Form)
+        self.phoneNumber.setGeometry(QtCore.QRect(70, 230, 180, 20))
+        self.cityChoice = QtWidgets.QComboBox(Form)
+        self.cityChoice.setGeometry(QtCore.QRect(110, 30, 100, 22))
+        font = QtGui.QFont()
+        font.setPointSize(10)
+        font.setBold(False)
+        font.setWeight(50)
+        self.cityChoice.setFont(font)
+        self.townChoice = QtWidgets.QComboBox(Form)
+        self.townChoice.setGeometry(QtCore.QRect(110, 110, 100, 22))
+        font = QtGui.QFont()
+        font.setPointSize(10)
+        self.townChoice.setFont(font)
+        self.districtChoice = QtWidgets.QComboBox(Form)
+        self.districtChoice.setGeometry(QtCore.QRect(110, 170, 100, 22))
+        font = QtGui.QFont()
+        font.setPointSize(10)
+        self.districtChoice.setFont(font)
+        self.address = QtWidgets.QLineEdit(Form)
+        self.address.setGeometry(QtCore.QRect(10, 280, 141, 20))
+        self.addressDescription = QtWidgets.QLineEdit(Form)
+        self.addressDescription.setGeometry(QtCore.QRect(170, 280, 141, 20))
+        self.label = QtWidgets.QLabel(Form)
+        self.label.setGeometry(QtCore.QRect(110, 200, 111, 16))
+        font = QtGui.QFont()
+        font.setBold(True)
+        font.setWeight(75)
+        self.label.setFont(font)
+        self.label_2 = QtWidgets.QLabel(Form)
+        self.label_2.setGeometry(QtCore.QRect(140, 10, 47, 13))
+        font = QtGui.QFont()
+        font.setBold(True)
+        font.setWeight(75)
+        self.label_2.setFont(font)
+        self.label_3 = QtWidgets.QLabel(Form)
+        self.label_3.setGeometry(QtCore.QRect(140, 80, 47, 13))
+        font = QtGui.QFont()
+        font.setBold(True)
+        font.setWeight(75)
+        self.label_3.setFont(font)
+        self.label_4 = QtWidgets.QLabel(Form)
+        self.label_4.setGeometry(QtCore.QRect(140, 140, 47, 13))
+        font = QtGui.QFont()
+        font.setBold(True)
+        font.setWeight(75)
+        self.label_4.setFont(font)
+        self.label_5 = QtWidgets.QLabel(Form)
+        self.label_5.setGeometry(QtCore.QRect(190, 260, 71, 16))
+        font = QtGui.QFont()
+        font.setBold(True)
+        font.setWeight(75)
+        self.label_5.setFont(font)
+        self.label_6 = QtWidgets.QLabel(Form)
+        self.label_6.setGeometry(QtCore.QRect(30, 260, 47, 13))
+        font = QtGui.QFont()
+        font.setBold(True)
+        font.setWeight(75)
+        self.label_6.setFont(font)
+        self.label_7 = QtWidgets.QLabel(Form)
+        self.label_7.setGeometry(QtCore.QRect(40, 370, 241, 20))
+        self.saveButton = QtWidgets.QPushButton(Form)
+        self.saveButton.setGeometry(QtCore.QRect(120, 340, 75, 23))
+
+        self.cityChoice.addItem("Adana", ["Ceyhan", "Çukurova", "Konakoğlu Mah.", "Kozan", "Sarıçam", "Seyhan", "Yüreğir"])
+        self.cityChoice.addItem("Adıyaman", ["Besni", "Çelikhan"])
+        self.cityChoice.addItem("Afyon", ["Basmakçı", "Çay"])
+        self.cityChoice.addItem("Ağrı", ["Diyadin", "Tutak"])
+        self.cityChoice.addItem("Amasya", ["Hamamözü", "Merkez"])
+        self.cityChoice.addItem("Ankara", ["Akyurt", "Etimesgut"])
+        self.cityChoice.addItem("Antalya", ["Akseki", "Aksu"])
+        self.cityChoice.addItem("Artvin", ["Ardanuç", "Hopa"])
+        self.cityChoice.addItem("Aydın", ["Bozdoğan", "Çine"])
+        self.cityChoice.addItem("Balıkesir", ["Ayvalık", "Balya"])
+        self.cityChoice.addItem("Bilecik", ["Bozüyük", "Merkez"])
+        self.cityChoice.addItem("Bingöl", ["Adaklı", "Genç"])
+        self.cityChoice.addItem("Bitlis", ["Ahlat", "Hizan"])
+        self.cityChoice.addItem("Bolu", ["Gerede", "Mudurnu"])
+        self.cityChoice.addItem("Burdur", ["Bucak", "Gölhisar"])
+        self.cityChoice.addItem("Bursa", ["Nilüfer", "Gürsu"])
+        self.cityChoice.addItem("Çanakkale", ["Ayvacık", "Biga"])
+        self.cityChoice.addItem("Çankırı", ["Orta", "Çerkeş"])
+        self.cityChoice.addItem("Çorum", ["Alaca", "Bayat"])
+        self.cityChoice.addItem("Denizli", ["Acıpayam", "Merkez"])
+        self.cityChoice.addItem("Diyarbakır", ["Bağlar", "Çınar"])
+        self.cityChoice.addItem("Edirne", ["Enez", "Keşan"])
+        self.cityChoice.addItem("Elazığ", ["Ağın", "Baskil"])
+        self.cityChoice.addItem("Erzincan", ["İliç", "Merkez"])
+        self.cityChoice.addItem("Erzurum", ["Aşkale", "Çat"])
+        self.cityChoice.addItem("Eskişehir", ["Tepebaşı", "Çifteler"])
+        self.cityChoice.addItem("Gaziantep", ["İlçe 1", "İlçe 2"])
+        self.cityChoice.addItem("Giresun", ["İlçe 1", "İlçe 2"])
+        self.cityChoice.addItem("Gümüşhane", ["İlçe 1", "İlçe 2"])
+        self.cityChoice.addItem("Hakkari", ["İlçe 1", "İlçe 2"])
+        self.cityChoice.addItem("Hatay", ["İlçe 1", "İlçe 2"])
+        self.cityChoice.addItem("Isparta", ["İlçe 1", "İlçe 2"])
+        self.cityChoice.addItem("Mersin", ["İlçe 1", "İlçe 2"])
+        self.cityChoice.addItem("İstanbul", ["İlçe 1", "İlçe 2"])
+        self.cityChoice.addItem("İzmir", ["İlçe 1", "İlçe 2"])
+        self.cityChoice.addItem("Kars", ["İlçe 1", "İlçe 2"])
+        self.cityChoice.addItem("Kastamonu", ["İlçe 1", "İlçe 2"])
+        self.cityChoice.addItem("Kayseri", ["İlçe 1", "İlçe 2"])
+        self.cityChoice.addItem("Kırklareli", ["İlçe 1", "İlçe 2"])
+        self.cityChoice.addItem("Kırşehir", ["İlçe 1", "İlçe 2"])
+        self.cityChoice.addItem("Kocaeli", ["İlçe 1", "İlçe 2"])
+        self.cityChoice.addItem("Konya", ["İlçe 1", "İlçe 2"])
+        self.cityChoice.addItem("Kütahya", ["İlçe 1", "İlçe 2"])
+        self.cityChoice.addItem("Malatya", ["İlçe 1", "İlçe 2"])
+        self.cityChoice.addItem("Manisa", ["İlçe 1", "İlçe 2"])
+        self.cityChoice.addItem("Kahramanmaraş", ["İlçe 1", "İlçe 2"])
+        self.cityChoice.addItem("Mardin", ["İlçe 1", "İlçe 2"])
+        self.cityChoice.addItem("Muğla", ["İlçe 1", "İlçe 2"])
+        self.cityChoice.addItem("Muş", ["İlçe 1", "İlçe 2"])
+        self.cityChoice.addItem("Nevşehir", ["İlçe 1", "İlçe 2"])
+        self.cityChoice.addItem("Niğde", ["İlçe 1", "İlçe 2"])
+        self.cityChoice.addItem("Ordu", ["İlçe 1", "İlçe 2"])
+        self.cityChoice.addItem("Rize", ["İlçe 1", "İlçe 2"])
+        self.cityChoice.addItem("Sakarya", ["İlçe 1", "İlçe 2"])
+        self.cityChoice.addItem("Samsun", ["İlçe 1", "İlçe 2"])
+        self.cityChoice.addItem("Siirt", ["İlçe 1", "İlçe 2"])
+        self.cityChoice.addItem("Sinop", ["İlçe 1", "İlçe 2"])
+        self.cityChoice.addItem("Sivas", ["İlçe 1", "İlçe 2"])
+        self.cityChoice.addItem("Tekirdağ", ["İlçe 1", "İlçe 2"])
+        self.cityChoice.addItem("Tokat", ["İlçe 1", "İlçe 2"])
+        self.cityChoice.addItem("Trabzon", ["İlçe 1", "İlçe 2"])
+        self.cityChoice.addItem("Tunceli", ["İlçe 1", "İlçe 2"])
+        self.cityChoice.addItem("Şanlıurfa", ["İlçe 1", "İlçe 2"])
+        self.cityChoice.addItem("Uşak", ["İlçe 1", "İlçe 2"])
+        self.cityChoice.addItem("Van", ["İlçe 1", "İlçe 2"])
+        self.cityChoice.addItem("Yozgat", ["İlçe 1", "İlçe 2"])
+        self.cityChoice.addItem("Zonguldak", ["İlçe 1", "İlçe 2"])
+        self.cityChoice.addItem("Aksaray", ["İlçe 1", "İlçe 2"])
+        self.cityChoice.addItem("Bayburt", ["İlçe 1", "İlçe 2"])
+        self.cityChoice.addItem("Karaman", ["İlçe 1", "İlçe 2"])
+        self.cityChoice.addItem("Kırıkkale", ["İlçe 1", "İlçe 2"])
+        self.cityChoice.addItem("Batman", ["İlçe 1", "İlçe 2"])
+        self.cityChoice.addItem("Şırnak", ["İlçe 1", "İlçe 2"])
+        self.cityChoice.addItem("Bartın", ["İlçe 1", "İlçe 2"])
+        self.cityChoice.addItem("Ardahan", ["İlçe 1", "İlçe 2"])
+        self.cityChoice.addItem("Iğdır", ["İlçe 1", "İlçe 2"])
+        self.cityChoice.addItem("Yalova", ["İlçe 1", "İlçe 2"])
+        self.cityChoice.addItem("Karabük", ["İlçe 1", "İlçe 2"])
+        self.cityChoice.addItem("Kilis", ["İlçe 1", "İlçe 2"])
+        self.cityChoice.addItem("Osmaniye", ["İlçe 1", "İlçe 2"])
+        self.cityChoice.addItem("Düzce", ["İlçe 1", "İlçe 2"])
+
+        self.districtChoice.addItem("Semt A")
+        self.districtChoice.addItem("Semt B")
+        self.districtChoice.addItem("Semt C")
+        self.districtChoice.addItem("Semt D")
+        self.districtChoice.addItem("Semt F")
+        self.districtChoice.addItem("Semt E")
+
+        self.cityChoice.currentIndexChanged.connect(self.cityChoiceIndexChanged)
+        self.cityChoiceIndexChanged(self.cityChoice.currentIndex())
+
+        class BigIntValidator(QtGui.QDoubleValidator):
+
+            def __init__(self, bottom=float('-inf'), top=float('inf')):
+                super(BigIntValidator, self).__init__(bottom, top, 0)
+                self.setNotation(QtGui.QDoubleValidator.StandardNotation)
+
+            def validate(self, text, pos):
+                if text.endswith('.'):
+                    return QtGui.QValidator.Invalid, text, pos
+                return super(BigIntValidator, self).validate(text, pos)
+
+        self.onlyInt = BigIntValidator()
+        self.phoneNumber.setValidator(self.onlyInt)
+        self.phoneNumber.setMaxLength(11)
+        self.address.setMaxLength(300)
+        self.addressDescription.setMaxLength(300)
+
+        update = False
+
+        if address_details != None:
+            self.address_details = address_details
+            update = True
+        
+        self.user_id = user_id
+        self.timer = timer
+
+        self.label_7.hide()
+
+        self.saveButton.clicked.connect(lambda:self.save_or_update_address(update, Form))
+
+        self.retranslateUi(Form)
+        QtCore.QMetaObject.connectSlotsByName(Form)
+
+    def retranslateUi(self, Form):
+        _translate = QtCore.QCoreApplication.translate
+        Form.setWindowTitle(_translate("Form", "Form"))
+        self.label.setText(_translate("Form", "Telefon Numarası:"))
+        self.label_2.setText(_translate("Form", "Şehir:"))
+        self.label_3.setText(_translate("Form", "İlçe:"))
+        self.label_4.setText(_translate("Form", "Semt:"))
+        self.label_5.setText(_translate("Form", "Adres Tarifi:"))
+        self.label_6.setText(_translate("Form", "Adres:"))
+        self.label_7.setText(_translate("Form", "<html><head/><body><p align=\"center\">Bütün Alanlar Zorunludur</p></body></html>"))
+        self.saveButton.setText(_translate("Form", "Kaydet"))
+
+    def save_or_update_address(self, update, Form):
+        address_form = {
+            "phone_number": self.phoneNumber.text(),
+            "city": str(self.cityChoice.currentText()),
+            "town": str(self.townChoice.currentText()),
+            "district": str(self.districtChoice.currentText()),
+            "address": self.address.text(),
+            "address_description": self.addressDescription.text(),
+            "user_id": self.user_id
+        }
+
+        validation_context = util.validate_address(address_form)
+        self.label_7.setText("<html><head/><body><p align=\"center\">" +validation_context['message']+ "</p></body></html>")
+        self.label_7.show()
+
+        if not update:
+            if validation_context['validated'] == True:
+                util.save_address(address_form)
+                self.timer.timeout.emit()
+                sleep(1)
+                Form.close()
+
+
+    def cityChoiceIndexChanged(self, index):
+        self.townChoice.clear()
+        data = self.cityChoice.itemData(index)
+        if data is not None:
+            self.townChoice.addItems(data)
 
 if __name__ == "__main__":
     import sys
@@ -461,4 +894,3 @@ if __name__ == "__main__":
     ui.setupUi(MainWindow)
     MainWindow.show()
     sys.exit(app.exec_())
-
