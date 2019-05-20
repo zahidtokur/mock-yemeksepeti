@@ -467,7 +467,7 @@ class OwnerMainWindow(object):
         font.setBold(False)
         font.setWeight(50)
         self.newOrdersTable.setFont(font)
-        self.newOrdersTable.setColumnCount(5)
+        self.newOrdersTable.setColumnCount(4)
         self.newOrdersTable.setRowCount(0)
         item = QtWidgets.QTableWidgetItem()
         self.newOrdersTable.setHorizontalHeaderItem(0, item)
@@ -477,8 +477,6 @@ class OwnerMainWindow(object):
         self.newOrdersTable.setHorizontalHeaderItem(2, item)
         item = QtWidgets.QTableWidgetItem()
         self.newOrdersTable.setHorizontalHeaderItem(3, item)
-        item = QtWidgets.QTableWidgetItem()
-        self.newOrdersTable.setHorizontalHeaderItem(4, item)
         self.newOrderDetailBtn = QtWidgets.QPushButton(self.newOrdersTab)
         self.newOrderDetailBtn.setGeometry(QtCore.QRect(717, 30, 75, 23))
         self.approveButton = QtWidgets.QPushButton(self.newOrdersTab)
@@ -538,8 +536,18 @@ class OwnerMainWindow(object):
         self.tabWidget.setCurrentIndex(0)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
 
+        self.new_orders = []
+        self.load_new_orders_to_table()
+
+        self.load_new_orders_timer = QtCore.QTimer()
+        self.load_new_orders_timer.setInterval(10000)
+        self.load_new_orders_timer.timeout.connect(self.load_new_orders_to_table)
+        self.load_new_orders_timer.start()
+
         self.load_products_timer = QtCore.QTimer()
         self.load_products_timer.timeout.connect(self.load_products_to_table)
+
+
 
         self.newProductButton.clicked.connect(lambda:self.show_new_product_window(self.restaurant_id))
         self.deleteProductButton.clicked.connect(self.delete_products)
@@ -550,14 +558,12 @@ class OwnerMainWindow(object):
         _translate = QtCore.QCoreApplication.translate
         MainWindow.setWindowTitle(_translate("MainWindow", "YemekSepeti"))
         item = self.newOrdersTable.horizontalHeaderItem(0)
-        item.setText(_translate("MainWindow", "ID"))
+        item.setText(_translate("MainWindow", "Sipariş Numarası"))
         item = self.newOrdersTable.horizontalHeaderItem(1)
         item.setText(_translate("MainWindow", "Tarih"))
         item = self.newOrdersTable.horizontalHeaderItem(2)
-        item.setText(_translate("MainWindow", "Ürünler"))
-        item = self.newOrdersTable.horizontalHeaderItem(3)
         item.setText(_translate("MainWindow", "Tutar"))
-        item = self.newOrdersTable.horizontalHeaderItem(4)
+        item = self.newOrdersTable.horizontalHeaderItem(3)
         item.setText(_translate("MainWindow", "Durum"))
         self.newOrderDetailBtn.setText(_translate("MainWindow", "Detay"))
         self.approveButton.setText(_translate("MainWindow", "Onayla"))
@@ -635,6 +641,15 @@ class OwnerMainWindow(object):
         self.update_product_window_ui = UpdateProductWindow()
         self.update_product_window_ui.setupUi(self.update_product_window, product_id, self.load_products_timer)
         self.update_product_window.show()
+
+    def load_new_orders_to_table(self):
+        self.new_orders = util.find_new_orders(self.restaurant_id)
+        self.newOrdersTable.setRowCount(0)
+        for row_number, row_data in enumerate(self.new_orders):
+            self.newOrdersTable.insertRow(row_number)
+            for column_number, data in enumerate(row_data):
+                self.newOrdersTable.setItem(
+                    row_number, column_number, QtWidgets.QTableWidgetItem(str(data)))
 
 
 class NewProductWindow(object):
@@ -719,8 +734,6 @@ class NewProductWindow(object):
                 util.save_product(product_name, product_description, float(product_price), self.restaurant_id)
                 self.label_4.setText("<html><head/><body><p align=\"center\">Ürün Kaydedildi!</p></body></html>")
                 timer.timeout.emit()
-            except sqlite3.IntegrityError:
-                self.label_4.setText("<html><head/><body><p align=\"center\">Bu İsme Sahip Bir Ürün Zaten Var!</p></body></html>")
             finally:
                 self.label_4.show()
 

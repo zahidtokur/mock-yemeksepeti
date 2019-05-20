@@ -2,6 +2,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 import util
 import sqlite3
 from time import sleep
+from datetime import datetime
 
 class LoginWindow(object):
     def setupUi(self, MainWindow):
@@ -406,6 +407,8 @@ class CustomerMainWindow(object):
         self.load_basket_timer.timeout.connect(self.load_basket)
         self.load_addresses_timer = QtCore.QTimer()
         self.load_addresses_timer.timeout.connect(self.load_addresses)
+        self.empty_basket_timer = QtCore.QTimer()
+        self.empty_basket_timer.timeout.connect(self.empty_basket)
 
 
         self.emptyBasketButton.clicked.connect(self.empty_basket)
@@ -413,6 +416,8 @@ class CustomerMainWindow(object):
 
         self.newAddressButton.clicked.connect(lambda:self.show_address_window(self.load_addresses_timer))
         self.load_addresses()
+
+        self.confirmButton.clicked.connect(self.confirm_order)
 
 
     def retranslateUi(self, MainWindow):
@@ -540,14 +545,44 @@ class CustomerMainWindow(object):
             self.address_window_ui = AddressWindow()
             self.address_window_ui.setupUi(self.address_window, self.user_id, timer)
             self.address_window.show()
+        # else:
+        #     self.address_window = QtWidgets.QWidget()
+        #     self.address_window_ui = AddressWindow()
+        #     self.address_window_ui.setupUi(self.address_window, self.user_id, timer, address_details)
 
     def load_addresses(self):
         self.addressList.clear()
-        self.addresses = util.find_addresses(self.user_id)
+        self.addresses = util.find_user_addresses(self.user_id)
         for data in self.addresses:
             item = str(list(data)[5])[:30] + "... " + str(list(data)[3]) + "/" + str(list(data)[2])
             self.addressList.addItem(item)
-            
+
+    def confirm_order(self):
+        rows = self.basketTable.rowCount()
+        if rows == 0:
+            return
+        
+        products = []
+        
+        for row in range(rows):
+            _id = self.basketTable.item(row, 0).text()
+            piece = self.basketTable.item(row, 1).text()
+            price = self.basketTable.item(row, 4).text()
+            products.append([_id, piece, price])
+
+        restaurant_city, restaurant_town = util.find_restaurant_address(products[0][0])
+        appropriate_addresses = []
+        for data in self.addresses:
+            if restaurant_city == str(list(data)[2]) and restaurant_town == str(list(data)[3]):
+                appropriate_addresses.append(data)
+        
+        if len(appropriate_addresses) == 0:
+            self.show_address_window(self.load_addresses_timer)
+        else:
+            self.select_address_window = QtWidgets.QWidget()
+            self.select_address_window_ui = SelectAddressWindow()
+            self.select_address_window_ui.setupUi(self.select_address_window, appropriate_addresses, products, self.empty_basket_timer)
+            self.select_address_window.show()  
         
 
 class AddToBasketWindow(object):
@@ -885,6 +920,54 @@ class AddressWindow(object):
         data = self.cityChoice.itemData(index)
         if data is not None:
             self.townChoice.addItems(data)
+
+
+class SelectAddressWindow(object):
+    def setupUi(self, Form, addresses, products, timer):
+        Form.resize(400, 177)
+        Form.setMinimumSize(QtCore.QSize(400, 177))
+        Form.setMaximumSize(QtCore.QSize(400, 177))
+        self.adressChoice = QtWidgets.QComboBox(Form)
+        self.adressChoice.setGeometry(QtCore.QRect(60, 70, 271, 22))
+        self.confirmButton = QtWidgets.QPushButton(Form)
+        self.confirmButton.setGeometry(QtCore.QRect(160, 120, 75, 23))
+        self.label = QtWidgets.QLabel(Form)
+        self.label.setGeometry(QtCore.QRect(160, 20, 81, 20))
+        font = QtGui.QFont()
+        font.setBold(True)
+        font.setWeight(75)
+        self.label.setFont(font)
+
+        self.products = products
+        self.addresses = addresses
+        for address in self.addresses:
+            self.adressChoice.addItem(str(list(address)[5][:60]) + "... " + str(list(address)[2]) + "/" + str(list(address)[3]))
+
+
+        self.retranslateUi(Form)
+        QtCore.QMetaObject.connectSlotsByName(Form)
+        self.confirmButton.clicked.connect(lambda:self.confirm_order(self.adressChoice.currentIndex(), timer, Form))
+
+    def retranslateUi(self, Form):
+        _translate = QtCore.QCoreApplication.translate
+        Form.setWindowTitle(_translate("Form", "Form"))
+        self.confirmButton.setText(_translate("Form", "Onayla"))
+        self.label.setText(_translate("Form", "Adres Seçin:"))
+
+    def confirm_order(self, address_index, timer, Form):
+        total_price = 0
+        for product in self.products:
+            total_price += float(product[2].replace(",","."))
+
+        date = datetime.now()
+        order_id = util.create_order(list(self.addresses[address_index])[0], total_price, date.strftime("%d-%m-%Y %H:%M"))
+        for product in self.products:
+            util.create_sold_product(order_id, product[0], int(product[1]), float(product[2].replace(",",".")))
+
+        timer.timeout.emit()
+        Form.close()
+
+        
 
 if __name__ == "__main__":
     import sys

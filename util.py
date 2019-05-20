@@ -38,11 +38,25 @@ def create_tables():
             password CHAR(14) NOT NULL)""",
         """CREATE TABLE IF NOT EXISTS Product(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name VARCHAR(200) NOT NULL UNIQUE,
+            name VARCHAR(200) NOT NULL,
             price REAL NOT NULL,
             description VARCHAR(200),
             restaurant_id INTEGER NOT NULL,
-            FOREIGN KEY(restaurant_id) REFERENCES Restaurant(id))""",           
+            FOREIGN KEY(restaurant_id) REFERENCES Restaurant(id))""",
+        """CREATE TABLE IF NOT EXISTS Order_(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            address_id INTEGER NOT NULL,
+            total_price REAL NOT NULL,
+            date TEXT NOT NULL,
+            state CHAR(13) DEFAULT 'Onay Bekliyor',
+            FOREIGN KEY(address_id) REFERENCES CustomerAddress(id))""",
+        """CREATE TABLE IF NOT EXISTS SoldProduct(
+            order_id INTEGER NOT NULL,
+            product_id INTEGER NOT NULL,
+            product_amount INTEGER NOT NULL,
+            price REAL NOT NULL,
+            FOREIGN KEY(order_id) REFERENCES Order_(id),
+            FOREIGN KEY(product_id) REFERENCES Product(id))""",
     ]
 
     for query in queries:
@@ -197,7 +211,7 @@ def find_products(restaurant_id):
     con.close()
     return result
 
-def find_addresses(customer_id):
+def find_user_addresses(customer_id):
     con = sqlite3.connect("database.db")
     cursor = con.cursor()
     query = 'SELECT id,phone_number,city,town,district,address,address_description FROM CustomerAddress WHERE customer_id = ?'
@@ -226,3 +240,38 @@ def save_address(address_form):
 
     con.commit()
     con.close()
+
+def find_restaurant_address(product_id):
+    con = sqlite3.connect("database.db")
+    cursor = con.cursor()
+    cursor.execute('SELECT restaurant_id FROM Product WHERE id = ?', (product_id,))
+    restaurant_id = cursor.fetchone()
+    cursor.execute('SELECT city, town FROM Restaurant WHERE id = ?', (restaurant_id[0],))
+    result = cursor.fetchone()
+    return result[0], result[1]
+    # return City, Town
+
+def create_order(address_id, total_price, date):
+    con = sqlite3.connect("database.db")
+    cursor = con.cursor()
+    cursor.execute('INSERT INTO Order_ (address_id, total_price, date) VALUES (?,?,?)', (address_id, total_price, date))
+    order_id = cursor.lastrowid
+    con.commit()
+    con.close()
+    return order_id
+
+def create_sold_product(order_id, product_id, product_amount, price):
+    con = sqlite3.connect('database.db')
+    cursor = con.cursor()
+    cursor.execute('INSERT INTO SoldProduct (order_id, product_id, product_amount, price) VALUES (?,?,?,?)',
+                    (order_id, product_id, product_amount, price))
+    con.commit()
+    con.close()
+
+def find_new_orders(restaurant_id):
+    con = sqlite3.connect('database.db')
+    cursor = con.cursor()
+    cursor.execute('SELECT id, date, total_price, state, address_id FROM Order_ WHERE state <> ?', ('Teslim Edildi',))
+    result = cursor.fetchall()
+    con.close()
+    return result
