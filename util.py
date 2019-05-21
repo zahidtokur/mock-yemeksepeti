@@ -65,6 +65,26 @@ def create_tables():
     con.commit()
     con.close()
 
+
+def create_order(address_id, total_price, date):
+    con = sqlite3.connect("database.db")
+    cursor = con.cursor()
+    cursor.execute('INSERT INTO Order_ (address_id, total_price, date) VALUES (?,?,?)',
+                   (address_id, total_price, date))
+    order_id = cursor.lastrowid
+    con.commit()
+    con.close()
+    return order_id
+
+
+def create_sold_product(order_id, product_id, product_amount, price):
+    con = sqlite3.connect('database.db')
+    cursor = con.cursor()
+    cursor.execute('INSERT INTO SoldProduct (order_id, product_id, product_amount, price) VALUES (?,?,?,?)',
+                   (order_id, product_id, product_amount, price))
+    con.commit()
+    con.close()
+
 def validate_user_register(register_form):
     #VALIDATING E-MAIL
     if not email_is_valid(register_form['email']):
@@ -154,6 +174,31 @@ def save_restaurant(register_form):
     con.commit()
     con.close()
 
+
+def save_product(name, description, price, restaurant_id):
+    con = sqlite3.connect("database.db")
+    cursor = con.cursor()
+    cursor.execute('INSERT INTO Product (name, price, description, restaurant_id) values (?,?,?,?)',
+                   (name, price, description, restaurant_id))
+
+    con.commit()
+    con.close()
+
+
+def save_address(address_form):
+    con = sqlite3.connect("database.db")
+    cursor = con.cursor()
+    query = """INSERT INTO CustomerAddress 
+    (phone_number, city, town, district, address, address_description, customer_id) 
+    VALUES (?,?,?,?,?,?,?)"""
+
+    cursor.execute(query,
+                   (address_form['phone_number'], address_form['city'], address_form['town'], address_form['district'],
+                    address_form['address'], address_form['address_description'], address_form['user_id']))
+
+    con.commit()
+    con.close()
+
 def authenticate_user(login_form):
     con = sqlite3.connect("database.db")
     cursor = con.cursor()
@@ -178,20 +223,19 @@ def authenticate_owner(login_form):
         return -1
 
 
-def save_product(name, description, price, restaurant_id):
-    con = sqlite3.connect("database.db")
-    cursor = con.cursor()
-    cursor.execute('INSERT INTO Product (name, price, description, restaurant_id) values (?,?,?,?)'
-                    ,(name, price, description, restaurant_id))
-
-    con.commit()
-    con.close()
-
-
 def update_product(name, description, price, product_id):
     con = sqlite3.connect("database.db")
     cursor = con.cursor()
     cursor.execute('UPDATE Product SET name = ?, description = ?, price = ? WHERE id = ?', (name, description, price, product_id))
+    con.commit()
+    con.close()
+
+
+def update_order_state(product_id, new_state):
+    con = sqlite3.connect('database.db')
+    cursor = con.cursor()
+    cursor.execute('UPDATE Order_ SET state = ? WHERE id = ?',
+                   (new_state, product_id))
     con.commit()
     con.close()
 
@@ -220,58 +264,89 @@ def find_user_addresses(customer_id):
     con.close()
     return result
 
-def empty_basket_db():
+
+def find_restaurant_address(product_id):
+    con = sqlite3.connect("database.db")
+    cursor = con.cursor()
+    cursor.execute(
+        'SELECT restaurant_id FROM Product WHERE id = ?', (product_id,))
+    restaurant_id = cursor.fetchone()
+    cursor.execute(
+        'SELECT city, town FROM Restaurant WHERE id = ?', (restaurant_id[0],))
+    result = cursor.fetchone()
+    return result[0], result[1]
+    # return City, Town
+
+
+def find_new_orders(restaurant_id):
+    con = sqlite3.connect('database.db')
+    cursor = con.cursor()
+    cursor.execute(
+        'SELECT id, date, total_price, state, address_id FROM Order_ WHERE state <> ?', ('Teslim Edildi',))
+    result = cursor.fetchall()
+    con.close()
+    return result
+
+
+def find_delivered_orders(restaurant_id):
+    con = sqlite3.connect('database.db')
+    cursor = con.cursor()
+    cursor.execute(
+        'SELECT id, date, total_price, state, address_id FROM Order_ WHERE state = ?', ('Teslim Edildi',))
+    result = cursor.fetchall()
+    con.close()
+    return result
+
+def empty_basket():
     con = sqlite3.connect("basket.db")
     cursor = con.cursor()
     cursor.execute('DELETE FROM Basket')
     con.commit()
     con.close()
 
-def save_address(address_form):
-    con = sqlite3.connect("database.db")
-    cursor = con.cursor()
-    query = """INSERT INTO CustomerAddress 
-    (phone_number, city, town, district, address, address_description, customer_id) 
-    VALUES (?,?,?,?,?,?,?)"""
-
-    cursor.execute(query, 
-                (address_form['phone_number'], address_form['city'], address_form['town'], address_form['district'], 
-                 address_form['address'], address_form['address_description'], address_form['user_id']))
-
-    con.commit()
-    con.close()
-
-def find_restaurant_address(product_id):
-    con = sqlite3.connect("database.db")
-    cursor = con.cursor()
-    cursor.execute('SELECT restaurant_id FROM Product WHERE id = ?', (product_id,))
-    restaurant_id = cursor.fetchone()
-    cursor.execute('SELECT city, town FROM Restaurant WHERE id = ?', (restaurant_id[0],))
-    result = cursor.fetchone()
-    return result[0], result[1]
-    # return City, Town
-
-def create_order(address_id, total_price, date):
-    con = sqlite3.connect("database.db")
-    cursor = con.cursor()
-    cursor.execute('INSERT INTO Order_ (address_id, total_price, date) VALUES (?,?,?)', (address_id, total_price, date))
-    order_id = cursor.lastrowid
-    con.commit()
-    con.close()
-    return order_id
-
-def create_sold_product(order_id, product_id, product_amount, price):
+def get_order_details(order_id):
     con = sqlite3.connect('database.db')
     cursor = con.cursor()
-    cursor.execute('INSERT INTO SoldProduct (order_id, product_id, product_amount, price) VALUES (?,?,?,?)',
-                    (order_id, product_id, product_amount, price))
-    con.commit()
-    con.close()
-
-def find_new_orders(restaurant_id):
-    con = sqlite3.connect('database.db')
-    cursor = con.cursor()
-    cursor.execute('SELECT id, date, total_price, state, address_id FROM Order_ WHERE state <> ?', ('Teslim Edildi',))
+    cursor.execute('SELECT product_id, product_amount FROM SoldProduct WHERE order_id = ?', (order_id,))
     result = cursor.fetchall()
+    product_ids = []
+    product_names = []
+    product_amounts = []
+    for i in result:
+        product_ids.append(list(i)[0])
+        product_amounts.append(list(i)[1])
+    for product_id in product_ids:
+        cursor.execute('SELECT name FROM Product WHERE id = ?', (product_id,))
+        result = cursor.fetchone()
+        product_names.append(list(result)[0])
+
+    products_str = ""
+    for product_amount, product_name in zip(product_amounts, product_names):
+        products_str += str(product_amount) + "x " + product_name + "\n"
+
+    cursor.execute('SELECT address_id, date, state FROM Order_ WHERE id = ?', (order_id,))
+    result = list(cursor.fetchone())
+    address_id = result[0]
+    date = result[1]
+    state = result[2]
+
+    cursor.execute('SELECT customer_id, city, town, district, address, address_description, phone_number FROM CustomerAddress WHERE id = ?', (address_id,))
+    result = list(cursor.fetchone())
+    address = result[4] + " " + result[3] + " " + result[2] + "/" + result[1]
+    customer_id = result[0]
+    address_description = result[5]
+    phone_number = result[-1]
+
+    cursor.execute('SELECT name, surname FROM Customer WHERE id = ?', (customer_id,))
+    result = list(cursor.fetchone())
+    customer_name = result[0] + " " + result[1]
+
     con.close()
-    return result
+    return [customer_name ,products_str, date, address, address_description, state, phone_number]
+
+def delete_address(address_id):
+    con = sqlite3.connect('database.db')
+    cursor = con.cursor()
+    cursor.execute('DELETE FROM CustomerAddress WHERE id = ?', (address_id,))
+    con.commit()
+    con.close()

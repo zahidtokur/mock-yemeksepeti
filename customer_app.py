@@ -15,6 +15,9 @@ class LoginWindow(object):
         font.setWeight(50)
         MainWindow.setFont(font)
         MainWindow.setWindowOpacity(1.0)
+        icon = QtGui.QIcon()
+        icon.addPixmap(QtGui.QPixmap("icon/online-order.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        MainWindow.setWindowIcon(icon)
         self.centralwidget = QtWidgets.QWidget(MainWindow)
         self.centralwidget.setObjectName("centralwidget")
         self.horizontalLayout = QtWidgets.QHBoxLayout(self.centralwidget)
@@ -214,6 +217,8 @@ class LoginWindow(object):
 class CustomerMainWindow(object):
     def setupUi(self, MainWindow, user_id):
         MainWindow.resize(598, 410)
+        MainWindow.setMinimumSize(QtCore.QSize(598, 410))
+        MainWindow.setMaximumSize(QtCore.QSize(598, 410))
         self.centralwidget = QtWidgets.QWidget(MainWindow)
         self.tabWidget = QtWidgets.QTabWidget(self.centralwidget)
         self.tabWidget.setGeometry(QtCore.QRect(0, 0, 601, 411))
@@ -222,6 +227,9 @@ class CustomerMainWindow(object):
         self.mainListWidget.setGeometry(QtCore.QRect(170, 30, 391, 331))
         font = QtGui.QFont()
         font.setPointSize(12)
+        icon = QtGui.QIcon()
+        icon.addPixmap(QtGui.QPixmap("icon/online-order.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        MainWindow.setWindowIcon(icon)
         self.mainListWidget.setFont(font)
         self.backButton = QtWidgets.QPushButton(self.mainTab)
         self.backButton.setGeometry(QtCore.QRect(468, 320, 75, 23))
@@ -286,10 +294,8 @@ class CustomerMainWindow(object):
         self.addressTab = QtWidgets.QWidget()
         self.newAddressButton = QtWidgets.QPushButton(self.addressTab)
         self.newAddressButton.setGeometry(QtCore.QRect(450, 80, 111, 23))
-        self.editAddressButton = QtWidgets.QPushButton(self.addressTab)
-        self.editAddressButton.setGeometry(QtCore.QRect(450, 160, 111, 23))
         self.deleteAddressButton = QtWidgets.QPushButton(self.addressTab)
-        self.deleteAddressButton.setGeometry(QtCore.QRect(454, 230, 101, 23))
+        self.deleteAddressButton.setGeometry(QtCore.QRect(450, 160, 111, 23))
         self.addressList = QtWidgets.QListWidget(self.addressTab)
         self.addressList.setGeometry(QtCore.QRect(35, 51, 401, 261))
         self.tabWidget.addTab(self.addressTab, "")
@@ -418,11 +424,12 @@ class CustomerMainWindow(object):
         self.load_addresses()
 
         self.confirmButton.clicked.connect(self.confirm_order)
+        self.deleteAddressButton.clicked.connect(self.delete_selected_address)
 
 
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
-        MainWindow.setWindowTitle(_translate("MainWindow", "MainWindow"))
+        MainWindow.setWindowTitle(_translate("MainWindow", "YemekSepeti"))
         self.backButton.setText(_translate("MainWindow", "Geri"))
         self.label.setText(_translate("MainWindow", "Şehir:"))
         self.label_2.setText(_translate("MainWindow", "İlçe:"))
@@ -446,7 +453,6 @@ class CustomerMainWindow(object):
         self.emptyBasketButton.setText(_translate("MainWindow", "Sepeti Boşalt"))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.basketTab), _translate("MainWindow", "Sepetim"))
         self.newAddressButton.setText(_translate("MainWindow", "Adres Ekle"))
-        self.editAddressButton.setText(_translate("MainWindow", "Seçili Adresi Düzenle"))
         self.deleteAddressButton.setText(_translate("MainWindow", "Sil"))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.addressTab), _translate("MainWindow", "Adreslerim"))
 
@@ -512,7 +518,7 @@ class CustomerMainWindow(object):
         self.totalPrice.setText("<html><head/><body><p align=\"center\">"+ price +" TL</p></body></html>")
 
     def empty_basket(self):
-        util.empty_basket_db()
+        util.empty_basket()
         self.load_basket()
 
     def remove_from_basket(self):
@@ -545,10 +551,6 @@ class CustomerMainWindow(object):
             self.address_window_ui = AddressWindow()
             self.address_window_ui.setupUi(self.address_window, self.user_id, timer)
             self.address_window.show()
-        # else:
-        #     self.address_window = QtWidgets.QWidget()
-        #     self.address_window_ui = AddressWindow()
-        #     self.address_window_ui.setupUi(self.address_window, self.user_id, timer, address_details)
 
     def load_addresses(self):
         self.addressList.clear()
@@ -583,13 +585,25 @@ class CustomerMainWindow(object):
             self.select_address_window_ui = SelectAddressWindow()
             self.select_address_window_ui.setupUi(self.select_address_window, appropriate_addresses, products, self.empty_basket_timer)
             self.select_address_window.show()  
+
+    def delete_selected_address(self):
+        rows = sorted(set(index.row()for index in self.addressList.selectedIndexes()))
+        if len(rows) != 1:
+            return
         
+        address_id = list(self.addresses[rows[0]])[0]
+        util.delete_address(address_id)
+        self.load_addresses()
+
 
 class AddToBasketWindow(object):
     def setupUi(self, Form, timer, product_id, product_name, product_price, product_description):
         Form.resize(400, 164)
         Form.setMinimumSize(QtCore.QSize(400, 164))
         Form.setMaximumSize(QtCore.QSize(400, 164))
+        icon = QtGui.QIcon()
+        icon.addPixmap(QtGui.QPixmap("icon/online-order.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        Form.setWindowIcon(icon)
         self.name = QtWidgets.QLineEdit(Form)
         self.name.setEnabled(True)
         self.name.setGeometry(QtCore.QRect(20, 50, 113, 20))
@@ -660,7 +674,7 @@ class AddToBasketWindow(object):
 
     def retranslateUi(self, Form):
         _translate = QtCore.QCoreApplication.translate
-        Form.setWindowTitle(_translate("Form", "Form"))
+        Form.setWindowTitle(_translate("Form", "Sepete Ekle"))
         self.addToBasketButton.setText(_translate("Form", "Sepete Ekle"))
         self.label.setText(_translate("Form", "Ürün:"))
         self.label_2.setText(_translate("Form", "Açıklama:"))
@@ -691,6 +705,9 @@ class AddressWindow(object):
         Form.resize(335, 407)
         Form.setMinimumSize(QtCore.QSize(335, 407))
         Form.setMaximumSize(QtCore.QSize(335, 407))
+        icon = QtGui.QIcon()
+        icon.addPixmap(QtGui.QPixmap("icon/online-order.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        Form.setWindowIcon(icon)
         self.phoneNumber = QtWidgets.QLineEdit(Form)
         self.phoneNumber.setGeometry(QtCore.QRect(70, 230, 180, 20))
         self.cityChoice = QtWidgets.QComboBox(Form)
@@ -882,7 +899,7 @@ class AddressWindow(object):
 
     def retranslateUi(self, Form):
         _translate = QtCore.QCoreApplication.translate
-        Form.setWindowTitle(_translate("Form", "Form"))
+        Form.setWindowTitle(_translate("Form", "Yeni Adres"))
         self.label.setText(_translate("Form", "Telefon Numarası:"))
         self.label_2.setText(_translate("Form", "Şehir:"))
         self.label_3.setText(_translate("Form", "İlçe:"))
@@ -927,6 +944,9 @@ class SelectAddressWindow(object):
         Form.resize(400, 177)
         Form.setMinimumSize(QtCore.QSize(400, 177))
         Form.setMaximumSize(QtCore.QSize(400, 177))
+        icon = QtGui.QIcon()
+        icon.addPixmap(QtGui.QPixmap("icon/online-order.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        Form.setWindowIcon(icon)
         self.adressChoice = QtWidgets.QComboBox(Form)
         self.adressChoice.setGeometry(QtCore.QRect(60, 70, 271, 22))
         self.confirmButton = QtWidgets.QPushButton(Form)
@@ -950,7 +970,7 @@ class SelectAddressWindow(object):
 
     def retranslateUi(self, Form):
         _translate = QtCore.QCoreApplication.translate
-        Form.setWindowTitle(_translate("Form", "Form"))
+        Form.setWindowTitle(_translate("Form", "Adres Seç"))
         self.confirmButton.setText(_translate("Form", "Onayla"))
         self.label.setText(_translate("Form", "Adres Seçin:"))
 

@@ -13,6 +13,9 @@ class RegisterWindow(object):
         font.setWeight(50)
         MainWindow.setFont(font)
         MainWindow.setWindowOpacity(1.0)
+        icon = QtGui.QIcon()
+        icon.addPixmap(QtGui.QPixmap("icon/online-order.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        MainWindow.setWindowIcon(icon)
         self.centralwidget = QtWidgets.QWidget(MainWindow)
         self.centralwidget.setObjectName("centralwidget")
         self.verticalLayout = QtWidgets.QVBoxLayout(self.centralwidget)
@@ -372,6 +375,9 @@ class LoginWindow(object):
         Form.resize(319, 211)
         Form.setMinimumSize(QtCore.QSize(319, 211))
         Form.setMaximumSize(QtCore.QSize(319, 211))
+        icon = QtGui.QIcon()
+        icon.addPixmap(QtGui.QPixmap("icon/online-order.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        Form.setWindowIcon(icon)
         self.emailField = QtWidgets.QLineEdit(Form)
         self.emailField.setGeometry(QtCore.QRect(100, 40, 150, 20))
         self.passwordField = QtWidgets.QLineEdit(Form)
@@ -410,7 +416,7 @@ class LoginWindow(object):
 
     def retranslateUi(self, Form):
         _translate = QtCore.QCoreApplication.translate
-        Form.setWindowTitle(_translate("Form", "Form"))
+        Form.setWindowTitle(_translate("Form", "YemekSepeti"))
         self.label.setText(_translate("Form", "Hesap Bulunamadı!"))
         self.registerBtn.setText(_translate("Form", "Hesabın Yok Mu? Kayıt Ol"))
         self.loginBtn.setText(_translate("Form", "Giriş Yap"))
@@ -449,7 +455,9 @@ class OwnerMainWindow(object):
         MainWindow.resize(800, 481)
         MainWindow.setMinimumSize(QtCore.QSize(800, 481))
         MainWindow.setMaximumSize(QtCore.QSize(800, 481))
-
+        icon = QtGui.QIcon()
+        icon.addPixmap(QtGui.QPixmap("icon/online-order.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        MainWindow.setWindowIcon(icon)
         self.restaurant_id = restaurant_id
 
         self.centralwidget = QtWidgets.QWidget(MainWindow)
@@ -537,7 +545,9 @@ class OwnerMainWindow(object):
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
 
         self.new_orders = []
+        self.delivered_orders = []
         self.load_new_orders_to_table()
+        self.load_delivered_orders_to_table()
 
         self.load_new_orders_timer = QtCore.QTimer()
         self.load_new_orders_timer.setInterval(10000)
@@ -548,10 +558,13 @@ class OwnerMainWindow(object):
         self.load_products_timer.timeout.connect(self.load_products_to_table)
 
 
-
+        self.approveButton.clicked.connect(lambda:self.update_order('Hazırlanıyor'))
+        self.deliveredButton.clicked.connect(lambda:self.update_order('Teslim Edildi'))
         self.newProductButton.clicked.connect(lambda:self.show_new_product_window(self.restaurant_id))
         self.deleteProductButton.clicked.connect(self.delete_products)
         self.editProductButton.clicked.connect(self.update_product)
+        self.pastOrderDetailBtn.clicked.connect(lambda:self.show_order_detail(-1))
+        self.newOrderDetailBtn.clicked.connect(lambda:self.show_order_detail(1))
         self.load_products_to_table()
 
     def retranslateUi(self, MainWindow):
@@ -582,9 +595,9 @@ class OwnerMainWindow(object):
         self.deleteProductButton.setText(_translate("MainWindow", "Sil"))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.productsTab), _translate("MainWindow", "Ürünler"))
         item = self.pastOrdersTable.horizontalHeaderItem(0)
-        item.setText(_translate("MainWindow", "ID"))
+        item.setText(_translate("MainWindow", "Sipariş Numarası"))
         item = self.pastOrdersTable.horizontalHeaderItem(1)
-        item.setText(_translate("MainWindow", "Ürünler"))
+        item.setText(_translate("MainWindow", "Tarih"))
         item = self.pastOrdersTable.horizontalHeaderItem(2)
         item.setText(_translate("MainWindow", "Tutar"))
         item = self.pastOrdersTable.horizontalHeaderItem(3)
@@ -651,6 +664,42 @@ class OwnerMainWindow(object):
                 self.newOrdersTable.setItem(
                     row_number, column_number, QtWidgets.QTableWidgetItem(str(data)))
 
+    def update_order(self, new_state):
+        rows = sorted(set(index.row() for index in self.newOrdersTable.selectedIndexes()))
+        if len(rows) != 1:
+            return
+        product_id = self.newOrdersTable.item(rows[0], 0).text()
+        util.update_order_state(product_id, new_state)
+        self.load_new_orders_to_table()
+        self.load_delivered_orders_to_table()
+
+    def load_delivered_orders_to_table(self):
+        self.delivered_orders = util.find_delivered_orders(self.restaurant_id)
+        self.pastOrdersTable.setRowCount(0)
+        for row_number, row_data in enumerate(self.delivered_orders):
+            self.pastOrdersTable.insertRow(row_number)
+            for column_number, data in enumerate(row_data):
+                self.pastOrdersTable.setItem(row_number, column_number, QtWidgets.QTableWidgetItem(str(data)))
+
+    def show_order_detail(self, signal):
+        if signal == -1: # eğer geçmiş siparişse
+            rows = sorted(set(index.row() for index in self.pastOrdersTable.selectedIndexes()))
+            if len(rows) != 1:
+                return
+            order_id = self.pastOrdersTable.item(rows[0], 0).text()
+        else:
+            rows = sorted(set(index.row() for index in self.newOrdersTable.selectedIndexes()))
+            if len(rows) != 1:
+                return
+            order_id = self.newOrdersTable.item(rows[0], 0).text()
+
+        order_details = util.get_order_details(order_id)
+
+        self.order_detail_window = QtWidgets.QWidget()
+        self.order_detail_window_ui = OrderDetailWindow()
+        self.order_detail_window_ui.setupUi(self.order_detail_window, order_details)
+        self.order_detail_window.show()
+
 
 class NewProductWindow(object):
 
@@ -659,6 +708,9 @@ class NewProductWindow(object):
         Form.resize(248, 282)
         Form.setMinimumSize(QtCore.QSize(248, 282))
         Form.setMaximumSize(QtCore.QSize(248, 282))
+        icon = QtGui.QIcon()
+        icon.addPixmap(QtGui.QPixmap("icon/online-order.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        Form.setWindowIcon(icon)
         self.nameField = QtWidgets.QLineEdit(Form)
         self.nameField.setGeometry(QtCore.QRect(40, 50, 161, 20))
         self.descriptionField = QtWidgets.QLineEdit(Form)
@@ -708,7 +760,7 @@ class NewProductWindow(object):
 
     def retranslateUi(self, Form):
         _translate = QtCore.QCoreApplication.translate
-        Form.setWindowTitle(_translate("Form", "Form"))
+        Form.setWindowTitle(_translate("Form", "Ürün Ekle"))
         self.label.setText(_translate("Form", "Ürün Adı*"))
         self.label_2.setText(_translate("Form", "Ürün Açıklaması"))
         self.label_3.setText(_translate("Form", "Fiyat*"))
@@ -745,6 +797,9 @@ class UpdateProductWindow(object):
         Form.resize(248, 282)
         Form.setMinimumSize(QtCore.QSize(248, 282))
         Form.setMaximumSize(QtCore.QSize(248, 282))
+        icon = QtGui.QIcon()
+        icon.addPixmap(QtGui.QPixmap("icon/online-order.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        Form.setWindowIcon(icon)
         self.nameField = QtWidgets.QLineEdit(Form)
         self.nameField.setGeometry(QtCore.QRect(40, 50, 161, 20))
         self.descriptionField = QtWidgets.QLineEdit(Form)
@@ -795,7 +850,7 @@ class UpdateProductWindow(object):
 
     def retranslateUi(self, Form):
         _translate = QtCore.QCoreApplication.translate
-        Form.setWindowTitle(_translate("Form", "Form"))
+        Form.setWindowTitle(_translate("Form", "Ürün Düzenle"))
         self.label.setText(_translate("Form", "Ürün Adı*"))
         self.label_2.setText(_translate("Form", "Ürün Açıklaması"))
         self.label_3.setText(_translate("Form", "Fiyat*"))
@@ -836,7 +891,104 @@ class UpdateProductWindow(object):
         self.priceField.setText(str(result[2]).replace(".",","))
         
 
+class OrderDetailWindow(object):
+    def setupUi(self, Form, order_details):
+        Form.setObjectName("Form")
+        Form.resize(400, 310)
+        Form.setMinimumSize(QtCore.QSize(400, 310))
+        Form.setMaximumSize(QtCore.QSize(400, 310))
+        icon = QtGui.QIcon()
+        icon.addPixmap(QtGui.QPixmap("icon/online-order.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        Form.setWindowIcon(icon)
+        self.label = QtWidgets.QLabel(Form)
+        self.label.setGeometry(QtCore.QRect(20, 10, 51, 16))
+        font = QtGui.QFont()
+        font.setBold(True)
+        font.setWeight(75)
+        self.label.setFont(font)
+        self.label_2 = QtWidgets.QLabel(Form)
+        self.label_2.setGeometry(QtCore.QRect(20, 80, 51, 16))
+        font = QtGui.QFont()
+        font.setBold(True)
+        font.setWeight(75)
+        self.label_2.setFont(font)
+        self.label_3 = QtWidgets.QLabel(Form)
+        self.label_3.setGeometry(QtCore.QRect(20, 220, 47, 13))
+        font = QtGui.QFont()
+        font.setBold(True)
+        font.setWeight(75)
+        self.label_3.setFont(font)
+        self.label_4 = QtWidgets.QLabel(Form)
+        self.label_4.setGeometry(QtCore.QRect(220, 10, 47, 13))
+        font = QtGui.QFont()
+        font.setBold(True)
+        font.setWeight(75)
+        self.label_4.setFont(font)
+        self.label_5 = QtWidgets.QLabel(Form)
+        self.label_5.setGeometry(QtCore.QRect(220, 120, 71, 16))
+        font = QtGui.QFont()
+        font.setBold(True)
+        font.setWeight(75)
+        self.label_5.setFont(font)
+        self.label_6 = QtWidgets.QLabel(Form)
+        self.label_6.setGeometry(QtCore.QRect(20, 160, 47, 13))
+        font = QtGui.QFont()
+        font.setBold(True)
+        font.setWeight(75)
+        self.label_6.setFont(font)
+        self.label_7 = QtWidgets.QLabel(Form)
+        self.label_7.setGeometry(QtCore.QRect(220, 220, 101, 16))
+        font = QtGui.QFont()
+        font.setBold(True)
+        font.setWeight(75)
+        self.label_7.setFont(font)
+        self.customer = QtWidgets.QLineEdit(Form)
+        self.customer.setGeometry(QtCore.QRect(20, 40, 161, 20))
+        self.customer.setReadOnly(True)
+        self.date = QtWidgets.QLineEdit(Form)
+        self.date.setGeometry(QtCore.QRect(20, 240, 161, 20))
+        self.date.setReadOnly(True)
+        self.products = QtWidgets.QTextEdit(Form)
+        self.products.setGeometry(QtCore.QRect(20, 100, 161, 51))
+        self.products.setReadOnly(True)
+        self.address = QtWidgets.QTextEdit(Form)
+        self.address.setGeometry(QtCore.QRect(220, 40, 161, 61))
+        self.address.setReadOnly(True)
+        self.state = QtWidgets.QLineEdit(Form)
+        self.state.setGeometry(QtCore.QRect(20, 190, 161, 20))
+        self.state.setReadOnly(True)
+        self.addressDescription = QtWidgets.QTextEdit(Form)
+        self.addressDescription.setGeometry(QtCore.QRect(220, 150, 161, 51))
+        self.addressDescription.setReadOnly(True)
+        self.phoneNumber = QtWidgets.QLineEdit(Form)
+        self.phoneNumber.setGeometry(QtCore.QRect(220, 240, 161, 20))
+        self.phoneNumber.setReadOnly(True)
+        self.okayButton = QtWidgets.QPushButton(Form)
+        self.okayButton.setGeometry(QtCore.QRect(160, 275, 75, 23))
 
+        self.retranslateUi(Form)
+        QtCore.QMetaObject.connectSlotsByName(Form)
+
+        self.okayButton.clicked.connect(Form.close)
+        self.customer.setText(order_details[0])
+        self.products.setText(order_details[1])
+        self.date.setText(order_details[2])
+        self.address.setText(order_details[3])
+        self.addressDescription.setText(order_details[4])
+        self.state.setText(order_details[5])
+        self.phoneNumber.setText(order_details[6])
+
+    def retranslateUi(self, Form):
+        _translate = QtCore.QCoreApplication.translate
+        Form.setWindowTitle(_translate("Form", "Sipariş Detayı"))
+        self.label.setText(_translate("Form", "Müşteri:"))
+        self.label_2.setText(_translate("Form", "Ürünler:"))
+        self.label_3.setText(_translate("Form", "Tarih:"))
+        self.label_4.setText(_translate("Form", "Adres:"))
+        self.label_5.setText(_translate("Form", "Adres Tarifi:"))
+        self.label_6.setText(_translate("Form", "Durum:"))
+        self.label_7.setText(_translate("Form", "Telefon Numarası:"))
+        self.okayButton.setText(_translate("Form", "Tamam"))
 
 
 
